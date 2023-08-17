@@ -1,0 +1,30 @@
+# Python virtual environment
+*.pyvenv
+.venv/
+venv/
+pyvenv.cfg
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Project-specific directories
+bin/
+lib/
+share/
+
+# IDE files
+.idea/
+
+# Other files
+.Python
+*.log
+data/
+data.zip
+models/
+models.zip
