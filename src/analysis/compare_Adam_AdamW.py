@@ -2,8 +2,9 @@ import pandas as pd
 import torch
 from torch.utils.data import Dataset, DataLoader
 from transformers import BertTokenizer, BertForSequenceClassification, AdamW
+from torch.optim import Adam
+import matplotlib.pyplot as plt
 
-# GPU 사용 설정
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 # 데이터 읽기
@@ -57,29 +58,55 @@ class MyDataset(Dataset):
 dataset = MyDataset(sentences, labels, tokenizer)
 dataloader = DataLoader(dataset, batch_size=32)
 
-# BERT 모델
 model = BertForSequenceClassification.from_pretrained('bert-base-multilingual-cased', num_labels=2)
 model = model.to(device)
 
-# 옵티마이저
-optimizer = AdamW(model.parameters(), lr=1e-5)
+# Adam 옵티마이저와 AdamW 옵티마이저 설정
+optimizers = {
+    'Adam': Adam(model.parameters(), lr=1e-5),
+    'AdamW': AdamW(model.parameters(), lr=1e-5)
+}
 
-# 학습
-model.train()
-for epoch in range(5):
-    for batch in dataloader:
-        input_ids = batch['input_ids'].to(device)
-        attention_mask = batch['attention_mask'].to(device)
-        labels = batch['label'].to(device)
+losses = {
+    'Adam': [],
+    'AdamW': []
+}
 
-        outputs = model(input_ids=input_ids, attention_mask=attention_mask, labels=labels)
-        loss = outputs.loss
-        loss.backward()
+# 옵티마이저별 학습
+for opt_name, optimizer in optimizers.items():
+    # 모델 초기 상태 저장
+    original_state = model.state_dict().copy()
+    model.train()
 
-        optimizer.step()
-        optimizer.zero_grad()
+    for epoch in range(5):
+        epoch_loss = 0.0
 
-    print(f'Epoch {epoch + 1}, Loss {loss.item()}')
+        for batch in dataloader:
+            input_ids = batch['input_ids'].to(device)
+            attention_mask = batch['attention_mask'].to(device)
+            labels = batch['label'].to(device)
 
-# 학습된 모델 저장
-torch.save(model.state_dict(), '../../models/bert_ver3.pt')
+            outputs = model(input_ids=input_ids, attention_mask=attention_mask, labels=labels)
+            loss = outputs.loss
+            loss.backward()
+
+            optimizer.step()
+            optimizer.zero_grad()
+
+            epoch_loss += loss.item()
+
+        # 에포크의 평균 손실 저장
+        losses[opt_name].append(epoch_loss / len(dataloader))
+        print(f'Optimizer: {opt_name}, Epoch {epoch + 1}, Loss {epoch_loss / len(dataloader)}')
+
+    # 모델을 초기 상태로 복원
+    model.load_state_dict(original_state)
+
+# 손실 그래프를 통한 비교
+plt.plot(losses['Adam'], label='Adam')
+plt.plot(losses['AdamW'], label='AdamW')
+plt.xlabel('Epochs')
+plt.ylabel('Loss')
+plt.legend()
+plt.title('Optimizer Comparison')
+plt.show()
